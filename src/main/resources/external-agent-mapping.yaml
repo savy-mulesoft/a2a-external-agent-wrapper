@@ -1,0 +1,135 @@
+# === Agent card identity ===
+agent:
+  host: "http://localhost:8081"
+  path: "/external-azure-fins"
+  name: "Fins Customer Support Agent"
+  version: "1.0.0"
+  description: "Customer Support Agent which answers transaction issues, double charging, etc."
+  skills:
+    - id: "1"
+      name: "Transaction Issues"
+      description: "Customer Support for Transaction Issues"
+    - id: "2"
+      name: "Financial Dispute Resolution Guidance"
+      description: "Guides users through disputes, fraud, duplicates."
+
+# === External agent (sample cURL) ===
+# Paste your POST/GET cURL exactly as you use it in Postman.
+curl:
+  request: |
+    curl --location 'https://financialservice-agent.cognitiveservices.azure.com/openai/deployments/FinS_Assist/chat/completions?api-version=2025-01-01-preview' \
+      --header 'Content-Type: application/json' \
+      --header 'api-key: YOUR_AZURE_API_KEY_HERE' \
+      --data '{
+          "messages": [
+              {
+                  "role": "user",
+                  "content": "my credit score is 700, i want to improve it"
+              }
+          ]
+      }'
+
+  # Optional: default timeout in ms (falls back to 30000 if omitted)
+  timeoutMs: 30000
+
+# === External agent sample response ===
+# Paste a representative JSON response. Cursor will use it to map back to A2A.
+response:
+  json: |
+    {
+          "choices": [
+              {
+                  "content_filter_results": {
+                      "hate": {
+                          "filtered": false,
+                          "severity": "safe"
+                      },
+                      "protected_material_code": {
+                          "filtered": false,
+                          "detected": false
+                      },
+                      "protected_material_text": {
+                          "filtered": false,
+                          "detected": false
+                      },
+                      "self_harm": {
+                          "filtered": false,
+                          "severity": "safe"
+                      },
+                      "sexual": {
+                          "filtered": false,
+                          "severity": "safe"
+                      },
+                      "violence": {
+                          "filtered": false,
+                          "severity": "safe"
+                      }
+                  },
+                  "finish_reason": "stop",
+                  "index": 0,
+                  "logprobs": null,
+                  "message": {
+                      "annotations": [],
+                      "content": "Improving your credit score is a great goal! Here are some strategies you can consider to help boost your score:\n\n1. **Pay Bills on Time**: Late payments can significantly impact your credit score. Set reminders or automate payments to ensure you never miss a due date.\n\n2. **Reduce Credit Card Balances**: Aim to keep your credit utilization ratio (the amount of credit you’re using relative to your total credit limit) below 30%. Paying down high balances can improve your score.\n\n3. **Avoid Opening New Accounts Too Quickly**: Each time you apply for credit, a hard inquiry is made on your credit report. Too many inquiries in a short period can lower your score. Only apply for credit when necessary.\n\n4. **Keep Old Accounts Open**: The length of your credit history affects your score, so keeping older accounts open, even if you don't use them often, can be beneficial.\n\n5. **Diversify Your Credit Mix**: Having a mix of different types of credit accounts (like credit cards, installment loans, etc.) can positively impact your score if managed well.\n\n6. **Limit Hard Inquiries**: Only apply for new credit when you need it. Frequent hard inquiries can lower your score.\n\n7. **Check Your Credit Report**: Review your credit reports for any errors or inaccuracies. You can dispute any errors you find to have them corrected.\n\n8. **Become an Authorized User**: If a family member or friend has good credit, see if they can add you as an authorized user on one of their credit cards. This can help boost your score by increasing your credit history and available credit.\n\n9. **Pay Off Debt**: Work on reducing outstanding debts, as this can improve your credit standing over time.\n\n10. **Consider Credit Counseling**: If you’re struggling to manage your debt or understand your credit, a certified credit counselor may provide valuable guidance.\n\nConsistency is key, and improving your credit score typically takes time, so be patient as you work on these strategies!",
+                      "refusal": null,
+                      "role": "assistant"
+                  }
+              }
+          ],
+          "created": 1757690485,
+          "id": "chatcmpl-CEzsTQPxN4DFeIalDXyZnb5l7olca",
+          "model": "gpt-4o-mini-2024-07-18",
+          "object": "chat.completion",
+          "prompt_filter_results": [
+              {
+                  "prompt_index": 0,
+                  "content_filter_results": {
+                      "hate": {
+                          "filtered": false,
+                          "severity": "safe"
+                      },
+                      "jailbreak": {
+                          "filtered": false,
+                          "detected": false
+                      },
+                      "self_harm": {
+                          "filtered": false,
+                          "severity": "safe"
+                      },
+                      "sexual": {
+                          "filtered": false,
+                          "severity": "safe"
+                      },
+                      "violence": {
+                          "filtered": false,
+                          "severity": "safe"
+                      }
+                  }
+              }
+          ],
+          "system_fingerprint": "fp_efad92c60b",
+          "usage": {
+              "completion_tokens": 409,
+              "completion_tokens_details": {
+                  "accepted_prediction_tokens": 0,
+                  "audio_tokens": 0,
+                  "reasoning_tokens": 0,
+                  "rejected_prediction_tokens": 0
+              },
+              "prompt_tokens": 19,
+              "prompt_tokens_details": {
+                  "audio_tokens": 0,
+                  "cached_tokens": 0
+              },
+              "total_tokens": 428
+          }
+      }
+
+# === Mapping hints (optional, only if not obvious from samples) ===
+mapping:
+  # Path inside the external request body where the user's text should go.
+  # Use JSON pointer-ish paths or dot notation; for arrays, use [0]
+  requestUserTextPath: "messages[0].content"
+
+  # Path inside the external response where the final text answer is found.
+  responseTextPath: "choices[0].message.content"

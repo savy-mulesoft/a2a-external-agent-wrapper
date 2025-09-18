@@ -1,0 +1,143 @@
+# MuleSoft Project .gitignore
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# IDE - Eclipse
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+.project
+.classpath
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+**/.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+# MuleSoft specific
+.mule/
+.mulefwk-workspace/
+.mulefwk/
+.mulefwk-workspace/
+.mulefwk-workspace/.mulefwk-workspace/
+.mulefwk-workspace/.mulefwk-workspace/.mulefwk-workspace/
+
+# Anypoint Studio
+.anypoint/
+.anypoint-studio/
+
+# Mule Runtime
+mule-standalone/
+mule-enterprise-standalone/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Configuration files with sensitive data
+config-local.properties
+config-dev.properties
+config-prod.properties
+*-local.properties
+*-dev.properties
+*-prod.properties
+
+# API Keys and secrets
+**/secrets/**
+**/keys/**
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+*.truststore
+
+# Test results
+test-output/
+surefire-reports/
+failsafe-reports/
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Node modules (if using any Node.js tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Package files
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Local development
+local/
+dev/
+test/
+
+# Tooling project files
+.tooling-project/
+.tooling-project

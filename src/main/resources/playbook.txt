@@ -1,0 +1,108 @@
+You are Cursor. Update this MuleSoft A2A External Wrapper project from the YAML file at:
+  src/main/resources/external-agent-mapping.yaml
+
+Goal
+- Keep the project a minimal A2A‑compliant wrapper that accepts an A2A task, calls a non‑A2A external agent over HTTP, and returns the smallest valid A2A response.
+- DO NOT add new modules or change the runtime. Only edit the existing files listed below.
+- Do not hallucinate. If a value or example is missing in YAML, keep the current code as‑is.
+
+Files to read
+1) src/main/resources/external-agent-mapping.yaml  (source of truth for external endpoint + request/response *samples*)
+2) src/main/mule/a2a-external-wrapper.xml          (flows + A2A server card)
+3) src/main/resources/config.properties            (external URL/headers/timeouts + agent card props)
+
+YAML guidance (what we expect to find)
+external:
+  url: string
+  method: POST|GET|PUT|PATCH         # default POST
+  timeoutMs: number                  # default 10000
+  headers: { <string>: <string> }    # HTTP headers as a map
+  # Use any embedded *samples* in YAML (e.g., sampleCurl, sampleRequest, sampleResponse)
+  # to infer the external payload/response shape. Do NOT depend on a formal external schema.
+  request:
+    modelParams:
+      temperature: number            # optional; default 0.2
+      max_tokens: number             # optional; default 300
+  response:
+    treatsBodyAsJson: true|false     # default true
+    # Prefer using the provided sampleResponse to infer how to extract the reply text.
+
+agent:
+  host: "http://localhost:8081"
+  path: "/azure-agent-fins"
+  name: "Fins Customer Support Agent"
+  version: "1.0.0"
+  description: "What the agent does"
+  skills:
+    - { id: "1", name: "Transaction Issues", description: "..." }
+    - { id: "2", name: "Financial Dispute Resolution Guidance", description: "..." }
+
+A) Update config.properties
+- Set these keys from YAML (create or overwrite):
+    external.url=<external.url>
+    external.method=<external.method or POST>
+    external.timeout.ms=<external.timeoutMs or 10000>
+    external.headers.json=<minified single-line JSON built from external.headers>
+    external.temperature=<modelParams.temperature or 0.2>
+    external.max_tokens=<modelParams.max_tokens or 300>
+    agent.host=<agent.host>
+    agent.path=<agent.path>
+    agent.name=<agent.name>
+    agent.version=<agent.version>
+    agent.description=<agent.description>
+
+- Materialize agent skills in config.properties to exactly match YAML — no placeholders:
+    agent.skill.1.id, agent.skill.1.name, agent.skill.1.description
+    agent.skill.2.id, ...
+  Rules:
+    • If YAML has fewer skills than config, DELETE the extra agent.skill.N.* entries from config.
+    • If YAML has more, ADD new agent.skill.N.* entries so that the count in config matches YAML exactly.
+    • Only the contiguous 1..N range is allowed (no gaps).
+
+- IMPORTANT: external.headers.json must be a single‑line JSON string with double quotes escaped if needed, e.g.
+    external.headers.json={"Accept":"application/json","Content-Type":"application/json","api-key":"***"}
+
+B) Update a2a-external-wrapper.xml (A2A card + flows)
+
+1. In <a2a:server-config>, keep using ${agent.*} placeholders already wired to config.properties for name/url/version/description.
+
+2. Replace all existing <a2a:skills> children with **exactly one <a2a:agent-skill> per agent.skill.N.* set present in config.properties** (no more, no less). Do NOT use expressions inside a2a:agent-skill attributes (card attributes don't support expressions).
+   Generate explicit static XML nodes by reading the properties and writing literal strings, e.g.:
+   <a2a:agent-skill id="1" name="Transaction Issues">
+     <a2a:description><![CDATA[Customer Support for Transaction Issues]]></a2a:description>
+   </a2a:agent-skill>
+   <!-- Skills generated from config.properties to mirror agent.skill.N.* exactly. -->
+
+3. Update transform > *** BUILD - Payload ***
+  REWRITE THIS ENTIRE TRANSFORMER with two clear parts:
+  
+  Part A - Extract the prompt value:
+    - Keep the existing "firstText" logic that extracts text from A2A message parts
+    - This part should remain the same as it currently works
+  
+  Part B - Build the request body:
+    - Look at the curl > request in external-agent-mapping.yaml
+    - Copy the EXACT structure from the curl request sample
+    - Use the requestUserTextPath from YAML mapping to know where to put the prompt value
+    - If requestUserTextPath is missing, intelligently identify which field should contain the prompt
+    - Use hardcoded values for temperature and max_tokens (do NOT use p() function in DataWeave)
+    - IMPORTANT: Do not use p("property.name") in DataWeave - use hardcoded values instead
+
+4. Update transform > *** BUILD - Response ***
+  Change ONLY the "content" variable extraction logic:
+  - Use the responseTextPath from YAML mapping to know where to extract the response text
+  - If responseTextPath is missing, intelligently identify which field contains the response text
+  - Keep everything else in the transformer the same
+
+C) Keep everything else untouched
+- Don't change connectors, namespaces, or logging.
+- Don't introduce dynamic expressions in A2A card attribute values.
+- Don't change the tester flow except where URL/headers need to be read from properties in the same way.
+
+D) Validate
+- Project compiles.
+- DW scripts compile (quote 'type' in parts objects).
+- **Skills parity**: Number of <a2a:agent-skill> nodes in XML equals the number of agent.skill.N.* groups in config.properties.
+- Properties exist for all skills you materialized.
+
+E) List all the changes you made in the code as a summary at the end.

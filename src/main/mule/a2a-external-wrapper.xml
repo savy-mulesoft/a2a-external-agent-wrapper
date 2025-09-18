@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:a2a="http://www.mulesoft.org/schema/mule/a2a"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/a2a  http://www.mulesoft.org/schema/mule/a2a/current/mule-a2a.xsd">
+
+  <!-- Externalized properties -->
+  <configuration-properties file="config.properties"/>
+
+  <!-- HTTP listener used by the A2A Server -->
+  <http:listener-config name="HTTP_Listener_config">
+    <http:listener-connection host="0.0.0.0" port="${http.listener.port}"/>
+  </http:listener-config>
+
+  <!-- HTTP Request config for external (non-A2A) agent -->
+  <http:request-config name="External_Agent_HTTP">
+    <http:request-connection protocol="HTTPS"/>
+  </http:request-config>
+
+  <!-- A2A Server + Agent Card (.well-known/agent.json served from here) -->
+  <a2a:server-config name="A2A_Server">
+  <a2a:connection listenerConfig="HTTP_Listener_config" agentPath="${agent.path}"/>
+  <a2a:card name="${agent.name}" url="${agent.host}${agent.path}" version="${agent.version}">
+    <a2a:description><![CDATA[${agent.description}]]></a2a:description>
+    <a2a:skills>
+      <a2a:agent-skill id="1" name="Transaction Issues">
+        <a2a:description><![CDATA[Customer Support for Transaction Issues]]></a2a:description>
+      </a2a:agent-skill>
+
+      <a2a:agent-skill id="2" name="Financial Dispute Resolution Guidance">
+        <a2a:description><![CDATA[Guides users through disputes, fraud, duplicates.]]></a2a:description>
+      </a2a:agent-skill>
+    </a2a:skills>
+  </a2a:card>
+</a2a:server-config>
+
+
+  <!-- Entry flow: receives A2A task, calls external agent, returns A2A-shaped response -->
+	<flow name="a2a-server-listner">
+    <a2a:task-listener config-ref="A2A_Server" doc:name="Task Listener"/>
+
+    <!-- Extract essentials from the A2A task -->
+
+    <!-- Build external request body from the A2A task -->
+
+    <!-- Call the external (non-A2A) agent -->
+
+    <!-- Normalize success into A2A status.completed -->
+		<flow-ref doc:name="Call External Agent Processor" doc:id="58bf81a1-c3e7-4ef8-8f04-b7d4595365d1" name="external-agent-processor"/>
+  </flow>
+	<flow name="external-agent-processor" doc:id="3ac21c53-f8ee-4086-8146-60aecf2b0755" >
+		<logger level="INFO" message="A2A task received: id=#[payload.id] sessionId=#[payload.sessionId]" />
+		
+		<ee:transform doc:name="Extract vars">
+  <ee:variables>
+    <ee:set-variable variableName="task_id"><![CDATA[%dw 2.0
+output application/java
+---
+payload.id
+]]></ee:set-variable>
+
+    <ee:set-variable variableName="session_id"><![CDATA[%dw 2.0
+output application/java
+---
+payload.sessionId
+]]></ee:set-variable>
+
+    <ee:set-variable variableName="userPrompt"><![CDATA[%dw 2.0
+output application/java
+var parts = (payload.message.parts default [])
+---
+((parts filter ((p) -> ((p.'type' default "") as String) == "text")) default [{ text: "" }])[0].text default ""
+]]></ee:set-variable>
+  </ee:variables>
+</ee:transform>
+
+		
+		<ee:transform doc:name="*** BUILD - Payload ***" doc:id="ca1027bd-3a81-41db-b1a4-a14ab48aff34">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Part A - Extract the prompt value (keep existing logic)
+var role      = (payload.role default "user") as String
+var parts     = (payload.message.parts default []) as Array
+var texts     = (parts filter ((p) -> ((p.'type' default "") as String) == "text"))
+                 map ((p) -> (p.text default ""))
+var firstText = (texts default ["" as String])[0] default ""
+
+// Part B - Build request body using EXACT structure from YAML curl sample
+// Using requestUserTextPath: "messages[0].content" from YAML mapping
+---
+{
+  messages: [
+    {
+      role: role,
+      content: firstText
+    }
+  ]
+}
+]]></ee:set-payload>
+			</ee:message>
+			
+			
+		</ee:transform>
+
+
+		<ee:transform doc:name="Apply external headers">
+  <ee:variables>
+    <ee:set-variable variableName="externalHeaders"><![CDATA[%dw 2.0
+output application/java
+---
+(read(p("external.headers.json") default "{}", "application/json") as Object)
+]]></ee:set-variable>
+  </ee:variables>
+</ee:transform>
+
+
+		<http:request config-ref="External_Agent_HTTP" method="POST" url="${external.url}" responseTimeout="${external.timeout.ms}" doc:name="Call External Agent" doc:id="73fdc5a3-8c5d-41c7-95e0-9cfbdc05648b">
+     
+      <http:headers><![CDATA[#[vars.externalHeaders]]]></http:headers>
+      
+    </http:request>
+		<ee:transform doc:name="*** BUILD - Response ***" doc:id="dd467c1b-59fe-4ebc-86eb-c98ea26ac05b">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Using responseTextPath: "choices[0].message.content" from YAML mapping
+var choices = (payload.choices default []) as Array
+var firstChoice = (choices[0] default {}) as Object
+var message = (firstChoice.message default {}) as Object
+var content = (message.content default null)
+
+---
+
+  {
+    id: vars.task_id,
+    sessionId: vars.session_id,
+    status: {
+      state: "completed",
+      timestamp: (now() >> "UTC") as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      message: {
+        role: "agent",
+        parts: [ { "type": "text", text: (content as String) } ]
+      }
+    }
+  }
+]]></ee:set-payload>
+  </ee:message>
+</ee:transform>
+		<logger level="INFO" message="Completed with status #[payload.status.state] for task #[payload.id]" />
+	</flow>
+	<flow name="http-server-listener" doc:id="6c2c4a24-6474-4be1-b23c-05dd89b6a716" >
+		<http:listener doc:name="Listener" doc:id="b9b0811c-cf89-4cdb-adde-79c6d41ebcd0" config-ref="HTTP_Listener_config" path="${http.validator.path}"/>
+		<flow-ref doc:name="Test External Agent Processor" doc:id="3a5822d8-ab35-44b9-bf1b-b98cffad633d" name="external-agent-processor"/>
+	</flow>
+</mule>

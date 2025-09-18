@@ -1,0 +1,10 @@
+{
+  "minMuleVersion": "4.9.9",
+  "javaSpecificationVersions": [
+    "17"
+  ],
+  "name": "A2A External Wrapper",
+  "description": "A minimal A2A-compliant wrapper that accepts an A2A task, calls a non-A2A external agent over HTTP, and returns the smallest valid A2A response",
+  "version": "1.0.0",
+  "classifier": "mule-application"
+}

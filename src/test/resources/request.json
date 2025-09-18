@@ -1,0 +1,13 @@
+{
+  "id": "test-task-123",
+  "sessionId": "test-session-456",
+  "message": {
+    "role": "user",
+    "parts": [
+      {
+        "type": "text",
+        "text": "How can I improve my credit score from 700?"
+      }
+    ]
+  }
+}

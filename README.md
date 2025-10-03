@@ -1,392 +1,166 @@
-# A2A External Wrapper — Template & Deployment Guide
+# A2A External Wrapper
 
-This is a **MuleSoft A2A External Wrapper template** that provides **two supported ways** to keep the wrapper in sync with an external agent: a **Manual** approach and a **Cursor‑driven** approach. Both achieve the same end state: **A2A in → external HTTP → A2A out**, with **no dependency on external schemas** (shapes are inferred from YAML samples).
+A MuleSoft application template for A2A (Application-to-Application) external integrations with automated deployment capabilities.
 
-## 🚀 Quick Start
+## 🚀 Quick Deployment
 
-### Option 1: Use from Anypoint Exchange
-1. Search for "A2A External Wrapper Template" in Anypoint Exchange
-2. Download the template
-3. Follow the configuration steps below
-
-### Option 2: Clone this Repository
+### Automated Local Deployment
 ```bash
-git clone <repository-url>
-cd a2a-external-wrapper
+# Deploy with automatic version increment
+./auto-deploy-to-exchange.sh
+
+# Deploy with specific version type
+./auto-deploy-to-exchange.sh minor
+./auto-deploy-to-exchange.sh major
+
+# Deploy with custom version
+./auto-deploy-to-exchange.sh 1.2.3
 ```
 
-## 📋 Prerequisites
-- MuleSoft Anypoint Platform account
-- MuleSoft Runtime 4.9.9+ 
-- Java 17+
+### GitHub Actions CI/CD
+- **Push to main** → Automatic deployment with patch version increment
+- **Create tag** → Deploy specific version (`git tag v1.2.3 && git push origin v1.2.3`)
+- **Manual trigger** → Use GitHub Actions UI for controlled deployment
+
+## 📋 Features
+
+- ✅ **Automated Version Management** - Intelligent version increment and conflict detection
+- ✅ **Exchange Integration** - Direct deployment to Anypoint Exchange
+- ✅ **CI/CD Pipeline** - GitHub Actions workflow for automated deployments
+- ✅ **Git Integration** - Automatic commits, tags, and releases
+- ✅ **Error Handling** - Rollback on failure and clear error messages
+- ✅ **Multiple Deployment Options** - Local script and cloud-based CI/CD
+
+## 🔧 Setup
+
+### Prerequisites
 - Maven 3.6+
+- Java 8+
+- Git
+- Anypoint Platform account with Exchange permissions
 
-## 🛠️ Configuration
+### Local Setup
+1. Clone the repository
+2. Ensure `settings.xml` contains valid Anypoint credentials
+3. Make deployment script executable: `chmod +x auto-deploy-to-exchange.sh`
 
-### 1. Update External Agent Configuration
-Edit `src/main/resources/external-agent-mapping.yaml` with your external agent details:
-- External API URL, method, headers
-- Request/response samples
-- Agent metadata and skills
+### GitHub Actions Setup
+1. Add repository secrets:
+   - `ANYPOINT_USERNAME` - Your Anypoint Platform username
+   - `ANYPOINT_PASSWORD` - Your Anypoint Platform password
+2. Push to main branch or use manual workflow trigger
 
-### 2. Run the Playbook
-Execute the instructions in `src/main/resources/playbook.txt` to automatically update the project.
+## 📖 Documentation
 
-## 🚀 Deployment
+- **[Automated Deployment Guide](AUTOMATED_DEPLOYMENT_GUIDE.md)** - Complete guide for automated deployments
+- **[Exchange Deployment Guide](EXCHANGE_DEPLOYMENT_GUIDE.md)** - Manual deployment instructions
+- **[Deployment Scripts](maven-publish-to-exchange.sh)** - Legacy deployment scripts
 
-### Deploy to CloudHub
-```bash
-mvn clean package
-# Deploy via Anypoint Platform or use Maven plugin
-```
+## 🎯 Current Version
 
-### Deploy to Runtime Fabric
-```bash
-mvn clean package
-# Deploy the generated JAR to your Runtime Fabric
-```
+**Version**: 1.0.4  
+**Exchange URL**: https://anypoint.mulesoft.com/exchange/e5c02810-ef86-427e-8e6b-f3d3abe55974/a2a-external-wrapper/
+
+## 🔗 Quick Links
+
+- [Anypoint Exchange Asset](https://anypoint.mulesoft.com/exchange/e5c02810-ef86-427e-8e6b-f3d3abe55974/a2a-external-wrapper/)
+- [GitHub Actions Workflows](.github/workflows/)
+- [Deployment Logs](https://github.com/savy-mulesoft/a2a-external-agent-wrapper/actions)
+
+## 🛠️ Development
 
 ### Local Development
 ```bash
+# Run tests
+mvn clean test
+
+# Package application
 mvn clean package
-java -jar target/a2a-external-wrapper-1.0.0-mule-application.jar
+
+# Deploy to local Mule runtime
+./run-with-mule-runtime.sh
 ```
 
-## 📖 Usage
-
-### A2A Endpoint
-- **URL**: `http://localhost:8082/external-azure-fins` (configurable)
-- **Method**: POST
-- **Content-Type**: application/json
-
-### Sample A2A Request
-```json
-{
-  "id": "task-123",
-  "sessionId": "session-456",
-  "message": {
-    "role": "user",
-    "parts": [
-      {
-        "type": "text",
-        "text": "How can I improve my credit score?"
-      }
-    ]
-  }
-}
-```
-
-### Sample A2A Response
-```json
-{
-  "id": "task-123",
-  "sessionId": "session-456",
-  "status": {
-    "state": "completed",
-    "timestamp": "2025-09-18T00:30:00Z",
-    "message": {
-      "role": "agent",
-      "parts": [
-        {
-          "type": "text",
-          "text": "Here are some ways to improve your credit score..."
-        }
-      ]
-    }
-  }
-}
-```
-
-## 🔧 Customization
-
-The wrapper is designed to be easily customizable for different external agents:
-
-1. **Update YAML Configuration**: Modify `external-agent-mapping.yaml` with your agent's details
-2. **Run Playbook**: Execute the automated update process
-3. **Deploy**: Package and deploy your customized wrapper
-
-## 📚 Documentation
-
----
-
-## What stays true in both approaches
-
-- **A2A boundaries are deterministic**
-  - **Build Payload** input is A2A (role + first text part, plus temperature/max_tokens from properties).
-  - **Build Response** output is A2A (minimal success or failure envelope).
-- **No external schema usage** — outbound/inbound mapping is **inferred** from samples provided in `external-agent-mapping.yaml` (e.g., `sampleCurl`, `sampleRequest`, `sampleResponse`). If no usable sample is present, fall back to a minimal OpenAI‑style JSON.
-- **Skills parity** — the count of `<a2a:agent-skill>` nodes in `a2a-external-wrapper.xml` **must exactly match** the number of `agent.skill.N.*` groups in `config.properties` (no gaps, no extras).
-- **Headers are one JSON string** — all external headers are carried in a single property key `external.headers.json` and parsed at runtime once:
-  ```dw
-  #[read(p("external.headers.json") default "{}", "application/json") as Object]
-  ```
-
----
-
-## Approach 1 — Manual Update
-
-### Files you will edit
-- `src/main/resources/config.properties`
-- `src/main/mule/a2a-external-wrapper.xml`
-- DataWeave transforms inside your flows for:
-  - **Build Payload** (A2A → external request)
-  - **Build Response** (external response → A2A)
-
-### Step‑by‑step
-
-1. **Review YAML samples**
-   - Open `src/main/resources/external-agent-mapping.yaml` and note:
-     - External **URL/method/timeout/headers**
-     - Any **`sampleCurl`/`sampleRequest`/`sampleResponse`** blocks to infer shapes
-     - Agent **metadata** and **skills**
-
-2. **Update `config.properties`**
-   - External config (create/overwrite if missing):
-     ```properties
-     external.url=<from YAML external.url>
-     external.method=<from YAML external.method or POST>
-     external.timeout.ms=<from YAML external.timeoutMs or 10000>
-     external.headers.json=<single-line JSON built from YAML external.headers>
-     external.temperature=<from YAML request.modelParams.temperature or 0.2>
-     external.max_tokens=<from YAML request.modelParams.max_tokens or 300>
-     ```
-   - Agent card config:
-     ```properties
-     agent.host=<from YAML agent.host>
-     agent.path=<from YAML agent.path>
-     agent.name=<from YAML agent.name>
-     agent.version=<from YAML agent.version>
-     agent.description=<from YAML agent.description>
-     ```
-   - **Agent skills (strict 1..N)**
-     ```properties
-     agent.skill.1.id=...
-     agent.skill.1.name=...
-     agent.skill.1.description=...
-     agent.skill.2.id=...
-     ...
-     ```
-     - If YAML has **fewer** skills than your properties, **delete** extras.
-     - If YAML has **more**, **add** the missing ones.
-     - **No gaps** in numbering: must be contiguous `1..N`.
-
-3. **Update `<a2a:agent-skill>` nodes in XML**
-   - In `src/main/mule/a2a-external-wrapper.xml`, **replace** the skills list with **exactly one** static `<a2a:agent-skill>` node per `agent.skill.N.*` set from properties (no expressions in attributes). Example:
-     ```xml
-     <a2a:agent-skill id="1" name="Transaction Issues">
-       <a2a:description><![CDATA[Customer support for transaction issues]]></a2a:description>
-     </a2a:agent-skill>
-     ```
-
-4. **Edit the two transformers**
-   - **Build Payload** (A2A → external JSON):
-     - role ← `payload.message.role` (default `"user"`)
-     - text ← first `payload.message.parts` where `'type' == "text"`
-     - temperature ← `${external.temperature}`
-     - max_tokens ← `${external.max_tokens}`
-     - **Infer** outbound JSON shape from YAML **samples**; if none, use minimal OpenAI‑style:
-       ```json
-       {
-         "messages": [{ "role": "<role>", "content": "<text>" }],
-         "temperature": <number>,
-         "max_tokens": <number>
-       }
-       ```
-     - **Tip:** Quote `'type'` when building parts in DW objects.
-   - **Build Response** (external → A2A):
-     - If `treatsBodyAsJson` is true (default), parse as JSON; else treat as plain text.
-     - **Infer** the reply path using YAML **sampleResponse**:
-       - If OpenAI‑like → `choices[0].message.content`
-       - Else try: `message.content`, `content`, `output`, `answer`, `data.result`, etc.
-       - If not found → return **A2A FAILED** with a short reason.
-     - Emit minimal A2A success envelope with `status.state="completed"` and one text part.
-
-5. **Validate**
-   - Build passes, DW compiles (including quoted `'type'`).
-   - Skills count in XML **equals** properties’ skills count.
-   - HTTP uses `${external.*}` and parses headers from `external.headers.json`.
-   - Manual smoke test with a sample A2A payload.
-
----
-
-## Approach 2 — Cursor‑Driven Update
-
-**Edit only one file:** `src/main/resources/external-agent-mapping.yaml`  
-Cursor reads your update instructions from `cursor-update-from-yaml.txt` and applies changes to both code and properties automatically.
-
-### What you edit
-- `external-agent-mapping.yaml` — provide/adjust:
-  - `external.url`, `external.method`, `external.timeoutMs`, `external.headers`
-  - `request.modelParams.temperature`, `request.modelParams.max_tokens`
-  - **Samples**: `sampleCurl` / `sampleRequest` / `sampleResponse` (the more precise, the better)
-  - `agent.host`, `agent.path`, `agent.name`, `agent.version`, `agent.description`
-  - `agent.skills` list (authoritative for skills parity)
-
-### What Cursor updates for you
-- `config.properties`:
-  - External keys (`external.*`) and `external.headers.json` (minified single‑line JSON)
-  - Agent keys (`agent.*`) and **skills** (`agent.skill.1.* … agent.skill.N.*`) with strict 1..N
-- `a2a-external-wrapper.xml`:
-  - Rewrites the `<a2a:agent-skill>` nodes to **exactly match** the skills count
-  - Keeps `<a2a:server-config>` using `${agent.*}` placeholders
-- **Transformers**:
-  - Updates **Build Payload** and **Build Response** by **inferring** JSON shapes from YAML samples (no external schema)
-
-### Example Cursor prompt
-Copy‑paste this into Cursor’s chat for the repo/workspace:
-
-```
-Ask Cursor to execute instruction in the playbook.txt in `src/main/resources`.
-When done, show a brief diff summary and any assumptions you made.
-```
-
-### Validation (Cursor approach)
-- After Cursor runs, confirm:
-  - Skills parity: XML count === properties count === YAML skills length
-  - Properties include `external.headers.json` as **single‑line JSON**
-  - Build & DW compile cleanly; run a quick test
-
----
-
-## Choosing an approach
-
-| Criterion | Manual | Cursor‑Driven |
-|---|---|---|
-| Time to update | Slower | Faster (one file + one prompt) |
-| Control/granularity | Highest | High, guided by playbook |
-| Risk of drift | Medium (human error) | Low (automated parity rules) |
-| Prereqs | Mule/DW familiarity | A good YAML with samples |
-
----
-
-## Quick reference snippets
-
-**Single‑line headers JSON (properties):**
-```properties
-external.headers.json={"Accept":"application/json","Content-Type":"application/json","api-key":"***"}
-```
-
-**Headers parsing in DW:**
-```dw
-#[read(p("external.headers.json") default "{}", "application/json") as Object]
-```
-
-**Minimal A2A success envelope (shape):**
-```json
-{
-  "status": {
-    "state": "completed",
-    "message": {
-      "role": "agent",
-      "parts": [{ "type": "text", "text": "<reply>" }]
-    }
-  }
-}
-```
-
----
-
-## Unit Testing
-
-### External Agent Processor Tests
-
-The project includes comprehensive unit tests for the DataWeave transformations that convert between A2A and external agent formats.
-
-#### Test Files
-
-1. **`src/test/resources/request.json`** - Sample A2A request payload
-2. **`src/test/resources/response.json`** - Sample external agent response payload  
-3. **`src/test/java/com/mycompany/ExternalAgentProcessorTest.java`** - JUnit test class
-
-#### What the Tests Verify
-
-1. **A2A Request Structure Validation**
-   - Verifies A2A request has required fields (id, sessionId, message)
-   - Validates message structure with role and parts
-   - Confirms text extraction from message parts
-
-2. **Expected External Request Format**
-   - Validates the structure that should be sent to external agent
-   - Verifies OpenAI-style format with messages, temperature, max_tokens
-   - Confirms proper role mapping ("user") and content extraction
-
-3. **External Response Structure Validation**
-   - Verifies external agent response format (Azure OpenAI structure)
-   - Validates choices array with message content
-   - Confirms assistant role and content extraction
-
-4. **Expected A2A Response Format**
-   - Validates the A2A response structure after transformation
-   - Verifies status object with state "completed" and timestamp
-   - Confirms proper message parts structure with agent role
-
-#### Running the Tests
+### Testing the A2A Endpoint
+Test the A2A wrapper using JSON-RPC protocol:
 
 ```bash
-# Run all tests
-mvn test
-
-# Run only the external agent processor tests
-mvn test -Dtest=ExternalAgentProcessorTest
-
-# Run tests with verbose output
-mvn test -Dtest=ExternalAgentProcessorTest -X
+curl --location 'http://localhost:8081/external-azure-fins' \
+--header 'Content-Type: application/json' \
+--data '{
+    "jsonrpc":"2.0","id":"1","method":"message/send",
+    "params":{"message":{"role":"user","parts":[{"kind":"text","text":"How do I improve my credit score?"}]}}
+}'
 ```
 
-#### Customizing Test Data
+**Expected Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "result": {
+    "id": null,
+    "sessionId": null,
+    "status": {
+      "state": "completed",
+      "timestamp": "2025-10-03T14:20:33Z",
+      "message": {
+        "role": "agent",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "Thanks for your message. This is a standard demo reply from the Finance Agent. For credit health: pay on time, keep utilization under 30%, avoid hard inquiries, and review reports for inaccuracies. (This mock returns the same text for any prompt.)\n"
+          }
+        ]
+      }
+    }
+  }
+}
+```
 
-To test with your specific external agent:
+### Version Management
+The application uses semantic versioning (MAJOR.MINOR.PATCH):
+- **PATCH**: Bug fixes and small updates
+- **MINOR**: New features, backward compatible
+- **MAJOR**: Breaking changes
 
-1. **Update `src/test/resources/request.json`** with a sample A2A request:
-   ```json
-   {
-     "id": "test-task-123",
-     "sessionId": "test-session-456", 
-     "message": {
-       "role": "user",
-       "parts": [
-         {
-           "type": "text",
-           "text": "Your test question here"
-         }
-       ]
-     }
-   }
-   ```
+## 📊 Deployment Status
 
-2. **Update `src/test/resources/response.json`** with your external agent's actual response format:
-   ```json
-   {
-     "choices": [
-       {
-         "message": {
-           "content": "Your agent's response format here"
-         }
-       }
-     ]
-   }
-   ```
+| Environment | Status | Version | Last Updated |
+|-------------|--------|---------|--------------|
+| Exchange | ✅ Active | 1.0.4 | Latest |
+| GitHub | ✅ Active | Latest | Auto-sync |
 
-3. **Run the tests** to verify your transformations work correctly
+## 🆘 Troubleshooting
 
-#### Test Coverage
+### Common Issues
+1. **Version Conflict (412 Error)**: Use `./auto-deploy-to-exchange.sh minor` to increment version
+2. **Authentication Failed**: Verify credentials in `settings.xml` or GitHub secrets
+3. **Permission Denied**: Contact Anypoint Platform administrator
 
-The tests ensure that:
-- ✅ A2A requests are properly transformed to external agent format
-- ✅ External agent responses are properly transformed to A2A format  
-- ✅ Required fields are present in both transformations
-- ✅ Data types and structures match expected formats
-- ✅ Error handling for missing or malformed data
+### Debug Commands
+```bash
+# Check current version
+grep -o '<version>[^<]*</version>' pom.xml | head -1
+
+# Test deployment with debug
+mvn clean deploy -s settings.xml -DskipTests -X
+
+# View deployment help
+./auto-deploy-to-exchange.sh --help
+```
+
+## 📝 Contributing
+
+1. Create feature branch from `main`
+2. Make changes and test locally
+3. Create pull request
+4. After merge, deployment happens automatically
+
+## 📄 License
+
+This project is licensed under the terms specified in the MuleSoft license agreement.
 
 ---
 
-## Common pitfalls & fixes
-
-- **Mismatch in skills count** → Ensure YAML skills length == number of `agent.skill.N.*` groups == number of `<a2a:agent-skill>` nodes.
-- **Unquoted `type` key in DW** → Use `'type'` in object literals.
-- **Headers not applied** → Verify `external.headers.json` is valid single‑line JSON and is parsed via `read(...)`.
-- **No usable sample in YAML** → Transformers should fall back to the minimal OpenAI‑style request and a generic path search for the reply (then fail gracefully if not found).
-
----
-
-**That’s it.** Pick your path, update the files, validate, and you’re good.
+**Need Help?** Check the [Automated Deployment Guide](AUTOMATED_DEPLOYMENT_GUIDE.md) for detailed instructions.

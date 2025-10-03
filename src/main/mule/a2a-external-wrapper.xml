@@ -37,6 +37,10 @@
       <a2a:agent-skill id="2" name="Financial Dispute Resolution Guidance">
         <a2a:description><![CDATA[Guides users through disputes, fraud, duplicates.]]></a2a:description>
       </a2a:agent-skill>
+
+      <a2a:agent-skill id="3" name="Credit Score Guidance">
+        <a2a:description><![CDATA[Guides users on how to improve credit scores]]></a2a:description>
+      </a2a:agent-skill>
     </a2a:skills>
   </a2a:card>
 </a2a:server-config>
@@ -55,6 +59,7 @@
     <!-- Normalize success into A2A status.completed -->
 		<flow-ref doc:name="Call External Agent Processor" doc:id="58bf81a1-c3e7-4ef8-8f04-b7d4595365d1" name="external-agent-processor"/>
   </flow>
+
 	<flow name="external-agent-processor" doc:id="3ac21c53-f8ee-4086-8146-60aecf2b0755" >
 		<logger level="INFO" message="A2A task received: id=#[payload.id] sessionId=#[payload.sessionId]" />
 		
@@ -88,27 +93,22 @@ var parts = (payload.message.parts default [])
 output application/json
 
 // Part A - Extract the prompt value (keep existing logic)
-var role      = (payload.role default "user") as String
 var parts     = (payload.message.parts default []) as Array
 var texts     = (parts filter ((p) -> ((p.'type' default "") as String) == "text"))
                  map ((p) -> (p.text default ""))
 var firstText = (texts default ["" as String])[0] default ""
 
 // Part B - Build request body using EXACT structure from YAML curl sample
-// Using requestUserTextPath: "messages[0].content" from YAML mapping
+// Using requestUserTextPath: "prompt" from YAML mapping
+// Using deterministic format for consistent responses
 ---
 {
-  messages: [
-    {
-      role: role,
-      content: firstText
-    }
-  ]
+  "prompt": firstText,
+  "conversation_id": "conv_demo_001",
+  "user_id": "user_123"
 }
 ]]></ee:set-payload>
 			</ee:message>
-			
-			
 		</ee:transform>
 
 
@@ -133,11 +133,10 @@ output application/java
 				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 
-// Using responseTextPath: "choices[0].message.content" from YAML mapping
-var choices = (payload.choices default []) as Array
-var firstChoice = (choices[0] default {}) as Object
-var message = (firstChoice.message default {}) as Object
-var content = (message.content default null)
+// Using responseTextPath: "content" from YAML mapping
+// Based on YAML sample response structure: agent_response.content
+var agentResponse = (payload.agent_response default {}) as Object
+var content = (agentResponse.content default null)
 
 ---
 
@@ -149,7 +148,7 @@ var content = (message.content default null)
       timestamp: (now() >> "UTC") as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
       message: {
         role: "agent",
-        parts: [ { "type": "text", text: (content as String) } ]
+        parts: [ { "kind": "text", text: (content as String) } ]
       }
     }
   }
@@ -157,9 +156,5 @@ var content = (message.content default null)
   </ee:message>
 </ee:transform>
 		<logger level="INFO" message="Completed with status #[payload.status.state] for task #[payload.id]" />
-	</flow>
-	<flow name="http-server-listener" doc:id="6c2c4a24-6474-4be1-b23c-05dd89b6a716" >
-		<http:listener doc:name="Listener" doc:id="b9b0811c-cf89-4cdb-adde-79c6d41ebcd0" config-ref="HTTP_Listener_config" path="${http.validator.path}"/>
-		<flow-ref doc:name="Test External Agent Processor" doc:id="3a5822d8-ab35-44b9-bf1b-b98cffad633d" name="external-agent-processor"/>
 	</flow>
 </mule>

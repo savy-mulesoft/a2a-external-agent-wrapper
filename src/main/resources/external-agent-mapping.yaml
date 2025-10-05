@@ -1,10 +1,10 @@
 # === Agent card identity ===
 agent:
   host: "http://localhost:8081"
-  path: "/external-azure-fins"
-  name: "ACME FINS Agent"
+  path: "/external-azure-agent"
+  name: "Azure FINS Agent"
   version: "1.0.0"
-  description: "ACME Financial Services Agent"
+  description: "Azure Financial Services Agent"
   skills:
     - id: "1"
       name: "Transaction Issues"
@@ -13,19 +13,24 @@ agent:
       name: "Financial Dispute Resolution Guidance"
       description: "Guides users through disputes, fraud, duplicates."
     - id: "3"
+      name: "Loan Recommendation"
+      description: "Guides users best loan options"
 
 # === External agent (sample cURL) ===
 # Paste your POST/GET cURL exactly as you use it in Postman.
 curl:
   request: |
-    curl --location 'https://anypoint.mulesoft.com/mocking/api/v1/links/84779860-5e74-4c1a-a1d7-30a130545de4/chat' \
-        --header 'Content-Type: application/json' \
-        --header 'X-API-Key: sk-1234567890abcdef' \
-        --data '{
-        "prompt": "How do I improve my credit score?",
-        "conversation_id": "conv_demo_001",
-        "user_id": "user_123"
-        }'
+    curl --location 'https://financialservice-agent.cognitiveservices.azure.com/openai/deployments/FinS_Assist/chat/completions?api-version=2025-01-01-preview' \
+      --header 'Content-Type: application/json' \
+      --header 'api-key: YOUR_AZURE_API_KEY_HERE' \
+      --data '{
+          "messages": [
+              {
+                  "role": "user",
+                  "content": "my credit score is 700, i want to improve it"
+              }
+          ]
+      }'
 
   # Optional: default timeout in ms (falls back to 30000 if omitted)
   timeoutMs: 30000
@@ -35,25 +40,93 @@ curl:
 response:
   json: |
     {
-        "response_id": "resp_demo_001",
-        "conversation_id": "conv_demo_001",
-        "agent_response": {
-            "content": "Thanks for your message. This is a standard demo reply from the Finance Agent. For credit health: pay on time, keep utilization under 30%, avoid hard inquiries, and review reports for inaccuracies. (This mock returns the same text for any prompt.)\n",
-            "confidence": 0.95,
-            "response_type": "answer",
-            "metadata": {
-            "processing_time_ms": 123,
-            "model_version": "mock-v1",
-            "tokens_used": 42,
-            "source": "finance_agent_mock"
+        "choices": [
+            {
+                "content_filter_results": {
+                    "hate": {
+                        "filtered": false,
+                        "severity": "safe"
+                    },
+                    "protected_material_code": {
+                        "filtered": false,
+                        "detected": false
+                    },
+                    "protected_material_text": {
+                        "filtered": false,
+                        "detected": false
+                    },
+                    "self_harm": {
+                        "filtered": false,
+                        "severity": "safe"
+                    },
+                    "sexual": {
+                        "filtered": false,
+                        "severity": "safe"
+                    },
+                    "violence": {
+                        "filtered": false,
+                        "severity": "safe"
+                    }
+                },
+                "finish_reason": "stop",
+                "index": 0,
+                "logprobs": null,
+                "message": {
+                    "annotations": [],
+                    "content": "Improving your credit score is a great goal! Here are some strategies you can use:\n\n1. **Pay Your Bills on Time**: Consistently paying your bills on time is one of the most significant factors that affect your credit score. Set up reminders or automatic payments to avoid missing deadlines.\n\n2. **Reduce Credit Utilization**: Try to keep your credit utilization below 30% of your total available credit. If possible, pay down outstanding balances or request a credit limit increase to improve your ratio.\n\n3. **Avoid New Hard Inquiries**: Each time you apply for new credit, a hard inquiry is made, which can temporarily lower your score. Try to limit new applications, especially for multiple new accounts in a short period.\n\n4. **Diversify Your Credit Mix**: If you only have credit cards, consider adding a different type of credit, such as an installment loan. A diverse mix of credit can positively impact your score.\n\n5. **Keep Old Accounts Open**: Length of credit history is also a factor. Keep your oldest accounts open even if you don’t use them frequently, as this can help maintain a longer average credit history.\n\n6. **Check Your Credit Report**: Regularly review your credit report for errors or inaccuracies that may negatively impact your score. If you find any, dispute them with the credit bureau.\n\n7. **Become an Authorized User**: If possible, have a family member or friend with a good credit history add you as an authorized user on their credit card. Their positive payment history can help improve your score.\n\n8. **Limit Hard Inquiries**: Too many inquiries in a short period can lower your score. Be strategic about applying for new credit, and try to limit hard pulls.\n\n9. **Use a Secured Credit Card**: If your credit is limited, consider using a secured credit card. This can help you build credit if you make small purchases and pay them off in full each month.\n\n10. **Set Financial Goals**: Setting clear financial goals, such as saving for a purchase or paying down debt, can help you make responsible financial decisions that positively impact your credit.\n\nImproving your credit score takes time and patience, but with consistent and responsible credit management, you can see positive results.",
+                    "refusal": null,
+                    "role": "assistant"
+                }
             }
-        },
-        "status": {
-            "code": "success",
-            "message": "Response generated successfully (mock)",
-            "timestamp": "2025-10-03T00:00:00Z"
+        ],
+        "created": 1759690962,
+        "id": "chatcmpl-CNOIEEdmWyEQ2l9x2HsSJBimxAWzI",
+        "model": "gpt-4o-mini-2024-07-18",
+        "object": "chat.completion",
+        "prompt_filter_results": [
+            {
+                "prompt_index": 0,
+                "content_filter_results": {
+                    "hate": {
+                        "filtered": false,
+                        "severity": "safe"
+                    },
+                    "jailbreak": {
+                        "filtered": false,
+                        "detected": false
+                    },
+                    "self_harm": {
+                        "filtered": false,
+                        "severity": "safe"
+                    },
+                    "sexual": {
+                        "filtered": false,
+                        "severity": "safe"
+                    },
+                    "violence": {
+                        "filtered": false,
+                        "severity": "safe"
+                    }
+                }
+            }
+        ],
+        "system_fingerprint": "fp_efad92c60b",
+        "usage": {
+            "completion_tokens": 459,
+            "completion_tokens_details": {
+                "accepted_prediction_tokens": 0,
+                "audio_tokens": 0,
+                "reasoning_tokens": 0,
+                "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 19,
+            "prompt_tokens_details": {
+                "audio_tokens": 0,
+                "cached_tokens": 0
+            },
+            "total_tokens": 478
         }
-        }
+    }
 
     
 
@@ -61,7 +134,7 @@ response:
 mapping:
   # Path inside the external request body where the user's text should go.
   # Use JSON pointer-ish paths or dot notation; for arrays, use [0]
-  requestUserTextPath: "prompt"
+  requestUserTextPath: "messages[0].content"
 
   # Path inside the external response where the final text answer is found.
-  responseTextPath: "agent_response.content"
+  responseTextPath: "choices[0].message.content"

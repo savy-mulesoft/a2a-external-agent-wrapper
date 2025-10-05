@@ -38,8 +38,8 @@
         <a2a:description><![CDATA[Guides users through disputes, fraud, duplicates.]]></a2a:description>
       </a2a:agent-skill>
 
-      <a2a:agent-skill id="3" name="Credit Score Guidance">
-        <a2a:description><![CDATA[Guides users on how to improve credit scores]]></a2a:description>
+      <a2a:agent-skill id="3" name="Loan Recommendation">
+        <a2a:description><![CDATA[Guides users best loan options]]></a2a:description>
       </a2a:agent-skill>
     </a2a:skills>
   </a2a:card>
@@ -47,7 +47,7 @@
 
 
   <!-- Entry flow: receives A2A task, calls external agent, returns A2A-shaped response -->
-	<flow name="a2a-server-listner">
+	<flow name="a2a-server-listener">
     <a2a:task-listener config-ref="A2A_Server" doc:name="Task Listener"/>
 
     <!-- Extract essentials from the A2A task -->
@@ -62,26 +62,27 @@
 
 	<flow name="external-agent-processor" doc:id="3ac21c53-f8ee-4086-8146-60aecf2b0755" >
 		<logger level="INFO" message="A2A task received: id=#[payload.id] sessionId=#[payload.sessionId]" />
+		<logger level="DEBUG" message="Full payload: #[payload]" />
 		
 		<ee:transform doc:name="Extract vars">
   <ee:variables>
     <ee:set-variable variableName="task_id"><![CDATA[%dw 2.0
 output application/java
 ---
-payload.id
+payload.id default (uuid() as String)
 ]]></ee:set-variable>
 
     <ee:set-variable variableName="session_id"><![CDATA[%dw 2.0
 output application/java
 ---
-payload.sessionId
+payload.sessionId default (uuid() as String)
 ]]></ee:set-variable>
 
     <ee:set-variable variableName="userPrompt"><![CDATA[%dw 2.0
 output application/java
 var parts = (payload.message.parts default [])
 ---
-((parts filter ((p) -> ((p.'type' default "") as String) == "text")) default [{ text: "" }])[0].text default ""
+((parts filter ((p) -> ((p.kind default "") as String) == "text")) default [{ text: "" }])[0].text default ""
 ]]></ee:set-variable>
   </ee:variables>
 </ee:transform>
@@ -94,18 +95,20 @@ output application/json
 
 // Part A - Extract the prompt value (keep existing logic)
 var parts     = (payload.message.parts default []) as Array
-var texts     = (parts filter ((p) -> ((p.'type' default "") as String) == "text"))
+var texts     = (parts filter ((p) -> ((p.kind default "") as String) == "text"))
                  map ((p) -> (p.text default ""))
 var firstText = (texts default ["" as String])[0] default ""
 
 // Part B - Build request body using EXACT structure from YAML curl sample
-// Using requestUserTextPath: "prompt" from YAML mapping
-// Using deterministic format for consistent responses
+// Using requestUserTextPath: "messages[0].content" from YAML mapping
 ---
 {
-  "prompt": firstText,
-  "conversation_id": "conv_demo_001",
-  "user_id": "user_123"
+  "messages": [
+    {
+      "role": "user",
+      "content": firstText
+    }
+  ]
 }
 ]]></ee:set-payload>
 			</ee:message>
@@ -117,7 +120,7 @@ var firstText = (texts default ["" as String])[0] default ""
     <ee:set-variable variableName="externalHeaders"><![CDATA[%dw 2.0
 output application/java
 ---
-(read(p("external.headers.json") default "{}", "application/json") as Object)
+read(p("external.headers.json"), "application/json") as Object {class: "java.util.HashMap"}
 ]]></ee:set-variable>
   </ee:variables>
 </ee:transform>
@@ -125,7 +128,7 @@ output application/java
 
 		<http:request config-ref="External_Agent_HTTP" method="POST" url="${external.url}" responseTimeout="${external.timeout.ms}" doc:name="Call External Agent" doc:id="73fdc5a3-8c5d-41c7-95e0-9cfbdc05648b">
      
-      <http:headers><![CDATA[#[vars.externalHeaders]]]></http:headers>
+      <http:headers>#[vars.externalHeaders]</http:headers>
       
     </http:request>
 		<ee:transform doc:name="*** BUILD - Response ***" doc:id="dd467c1b-59fe-4ebc-86eb-c98ea26ac05b">
@@ -133,25 +136,24 @@ output application/java
 				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 
-// Using responseTextPath: "content" from YAML mapping
-// Based on YAML sample response structure: agent_response.content
-var agentResponse = (payload.agent_response default {}) as Object
-var content = (agentResponse.content default null)
+// Using responseTextPath: "choices[0].message.content" from YAML mapping
+// Based on YAML sample response structure
+var content = (payload.choices[0].message.content default "")
 
 ---
-
-  {
-    id: vars.task_id,
-    sessionId: vars.session_id,
-    status: {
-      state: "completed",
-      timestamp: (now() >> "UTC") as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-      message: {
-        role: "agent",
-        parts: [ { "kind": "text", text: (content as String) } ]
-      }
+{
+  kind: "task",
+  id: vars.task_id,
+  sessionId: vars.session_id,
+  status: {
+    state: "completed",
+    timestamp: (now() >> "UTC") as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    message: {
+      role: "agent",
+      parts: [ { "type": "text", text: (content as String) } ]
     }
   }
+}
 ]]></ee:set-payload>
   </ee:message>
 </ee:transform>

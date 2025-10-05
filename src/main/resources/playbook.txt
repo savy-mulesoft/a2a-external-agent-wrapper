@@ -2,9 +2,11 @@ You are Cursor. Update this MuleSoft A2A External Wrapper project from the YAML 
   src/main/resources/external-agent-mapping.yaml
 
 Goal
-- Keep the project a minimal A2A‑compliant wrapper that accepts an A2A task, calls a non‑A2A external agent over HTTP, and returns the smallest valid A2A response.
+- Keep the project a GENERIC, minimal A2A‑compliant wrapper that accepts an A2A task, calls a non‑A2A external agent over HTTP, and returns the smallest valid A2A response.
 - DO NOT add new modules or change the runtime. Only edit the existing files listed below.
 - Do not hallucinate. If a value or example is missing in YAML, keep the current code as‑is.
+- MINIMAL CHANGES ONLY: Touch only what's needed - agent skills in XML and the DataWeave output structures. Do NOT modify server config, listeners, connectors, or A2A protocol handling.
+- NO ERROR HIDING: Do not add try-catch, defaults, or fallback logic in DataWeave. If something fails, it should fail loudly for debugging.
 
 Files to read
 1) src/main/resources/external-agent-mapping.yaml  (source of truth for external endpoint + request/response *samples*)
@@ -64,35 +66,44 @@ A) Update config.properties
 
 B) Update a2a-external-wrapper.xml (A2A card + flows)
 
-1. In <a2a:server-config>, keep using ${agent.*} placeholders already wired to config.properties for name/url/version/description.
+1. DO NOT MODIFY <a2a:server-config> or <http:listener-config> or any connector configurations - these remain as-is.
 
-2. Replace all existing <a2a:skills> children with **exactly one <a2a:agent-skill> per agent.skill.N.* set present in config.properties** (no more, no less). Do NOT use expressions inside a2a:agent-skill attributes (card attributes don't support expressions).
+2. Replace ONLY the <a2a:skills> children with **exactly one <a2a:agent-skill> per agent.skill.N.* set present in config.properties** (no more, no less). Do NOT use expressions inside a2a:agent-skill attributes (card attributes don't support expressions).
    Generate explicit static XML nodes by reading the properties and writing literal strings, e.g.:
    <a2a:agent-skill id="1" name="Transaction Issues">
      <a2a:description><![CDATA[Customer Support for Transaction Issues]]></a2a:description>
    </a2a:agent-skill>
    <!-- Skills generated from config.properties to mirror agent.skill.N.* exactly. -->
 
+2b. The "Apply external headers" transform should use this DataWeave expression (do NOT add try-catch or defaults):
+   %dw 2.0
+   output application/java
+   ---
+   read(p("external.headers.json"), "application/json") as Object {class: "java.util.HashMap"}
+   
+   This will fail loudly if external.headers.json is not valid JSON - which is intentional for debugging.
+
 3. Update transform > *** BUILD - Payload ***
-  REWRITE THIS ENTIRE TRANSFORMER with two clear parts:
+  ONLY update the DataWeave output structure to match the external API:
   
-  Part A - Extract the prompt value:
-    - Keep the existing "firstText" logic that extracts text from A2A message parts
-    - This part should remain the same as it currently works
+  Part A - Extract the user prompt (KEEP EXISTING LOGIC):
+    - Keep the existing "firstText" variable that extracts text from A2A message parts
+    - Do NOT modify the A2A message parsing logic
   
-  Part B - Build the request body:
-    - Look at the curl > request in external-agent-mapping.yaml
-    - Copy the EXACT structure from the curl request sample
-    - Use the requestUserTextPath from YAML mapping to know where to put the prompt value
-    - If requestUserTextPath is missing, intelligently identify which field should contain the prompt
-    - Use hardcoded values for temperature and max_tokens (do NOT use p() function in DataWeave)
-    - IMPORTANT: Do not use p("property.name") in DataWeave - use hardcoded values instead
+  Part B - Build the request body (UPDATE ONLY THIS PART):
+    - Use the curl > request sample from external-agent-mapping.yaml to determine the JSON structure
+    - Use requestUserTextPath from YAML mapping.mapping to place the user prompt in the correct field
+    - For API parameters (like temperature, max_tokens): Use ${external.temperature} and ${external.max_tokens} placeholders ONLY in the output structure comments, then hardcode the literal values (e.g., 0.2, 300) in the actual JSON
+    - Example: If external API expects {"prompt": "...", "temperature": 0.7}, output: {prompt: firstText, temperature: 0.7}
+    - Keep the structure generic - do NOT add API-specific fields unless they exist in the YAML sample
 
 4. Update transform > *** BUILD - Response ***
-  Change ONLY the "content" variable extraction logic:
-  - Use the responseTextPath from YAML mapping to know where to extract the response text
-  - If responseTextPath is missing, intelligently identify which field contains the response text
-  - Keep everything else in the transformer the same
+  Change ONLY the "content" variable extraction logic - DO NOT modify the A2A response structure:
+  - Use the responseTextPath from YAML mapping.mapping to extract the response text
+  - Example: If responseTextPath is "choices[0].message.content", use: var content = payload.choices[0].message.content
+  - If responseTextPath is "response.text", use: var content = payload.response.text
+  - DO NOT add default values or try-catch - let it fail if the path is wrong
+  - Keep the rest of the A2A response structure exactly as-is (kind, id, sessionId, status, message, parts)
 
 C) Keep everything else untouched
 - Don't change connectors, namespaces, or logging.

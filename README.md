@@ -1,115 +1,169 @@
-# A2A External Wrapper
+# A2A External Agent Wrapper
 
-A MuleSoft application template for A2A (Application-to-Application) external integrations with automated deployment capabilities.
+A MuleSoft application that provides an A2A (Application-to-Application) compliant wrapper for integrating external agents via HTTP. This wrapper enables external AI agents or services to participate in A2A conversations by translating between A2A protocol and standard HTTP/JSON APIs.
 
-## 🚀 Quick Deployment
+## What This Project Does
 
-### Automated Local Deployment
-```bash
-# Deploy with automatic version increment
-./auto-deploy-to-exchange.sh
+This application acts as a bridge between:
+- **A2A Protocol**: MuleSoft's Agent-to-Agent communication standard
+- **External HTTP APIs**: Any external agent or AI service that accepts HTTP requests
 
-# Deploy with specific version type
-./auto-deploy-to-exchange.sh minor
-./auto-deploy-to-exchange.sh major
+### Key Features
 
-# Deploy with custom version
-./auto-deploy-to-exchange.sh 1.2.3
+- **A2A Server**: Exposes an A2A-compliant endpoint that can receive tasks from other A2A agents
+- **HTTP Translation**: Converts A2A messages to HTTP requests for external services
+- **Response Mapping**: Transforms external service responses back to A2A format
+- **Agent Card**: Publishes agent capabilities via `.well-known/agent.json` endpoint
+- **Configurable Mapping**: Easy configuration of request/response transformations
+
+## How It Works
+
+1. **Receives A2A Task**: The application listens for A2A tasks containing user messages
+2. **Extracts User Input**: Parses the user's text from the A2A message structure
+3. **Calls External Agent**: Makes HTTP request to configured external service
+4. **Returns A2A Response**: Transforms the external response into A2A-compliant format
+
+## Project Structure
+
+```
+├── src/main/mule/
+│   └── a2a-external-wrapper.xml     # Main Mule flow configuration
+├── src/main/resources/
+│   ├── config.properties            # Application configuration
+│   ├── external-agent-mapping.yaml # External agent configuration
+│   └── log4j2.xml                  # Logging configuration
+├── pom.xml                          # Maven project configuration
+└── README.md                        # This file
 ```
 
-### GitHub Actions CI/CD
-- **Push to main** → Automatic deployment with patch version increment
-- **Create tag** → Deploy specific version (`git tag v1.2.3 && git push origin v1.2.3`)
-- **Manual trigger** → Use GitHub Actions UI for controlled deployment
+## Configuration
 
-## 📋 Features
+### Agent Configuration (`external-agent-mapping.yaml`)
 
-- ✅ **Automated Version Management** - Intelligent version increment and conflict detection
-- ✅ **Exchange Integration** - Direct deployment to Anypoint Exchange
-- ✅ **CI/CD Pipeline** - GitHub Actions workflow for automated deployments
-- ✅ **Git Integration** - Automatic commits, tags, and releases
-- ✅ **Error Handling** - Rollback on failure and clear error messages
-- ✅ **Multiple Deployment Options** - Local script and cloud-based CI/CD
+Configure your external agent details:
 
-## 🔧 Setup
+```yaml
+# Agent identity for A2A
+agent:
+  host: "http://localhost:8081"
+  path: "/external-azure-fins"
+  name: "ACME FINS Agent"
+  version: "1.0.0"
+  description: "ACME Financial Services Agent"
+
+# External service cURL example
+curl:
+  request: |
+    curl --location 'https://your-external-service.com/chat' \
+        --header 'Content-Type: application/json' \
+        --data '{"prompt": "user input here"}'
+
+# Sample response from external service
+response:
+  json: |
+    {
+      "agent_response": {
+        "content": "Response text from external agent"
+      }
+    }
+
+# Mapping configuration
+mapping:
+  requestUserTextPath: "prompt"
+  responseTextPath: "agent_response.content"
+```
+
+### Application Properties (`config.properties`)
+
+```properties
+# HTTP listener configuration
+http.listener.port=8081
+
+# External service configuration
+external.url=https://your-external-service.com/chat
+external.timeout.ms=30000
+
+# Agent configuration
+agent.host=http://localhost:8081
+agent.path=/external-azure-fins
+agent.name=ACME FINS Agent
+agent.version=1.0.0
+agent.description=ACME Financial Services Agent
+```
+
+## Running the Application
 
 ### Prerequisites
-- Maven 3.6+
 - Java 8+
-- Git
-- Anypoint Platform account with Exchange permissions
-
-### Local Setup
-1. Clone the repository
-2. Ensure `settings.xml` contains valid Anypoint credentials
-3. Make deployment script executable: `chmod +x auto-deploy-to-exchange.sh`
-
-### GitHub Actions Setup
-1. Add repository secrets:
-   - `ANYPOINT_USERNAME` - Your Anypoint Platform username
-   - `ANYPOINT_PASSWORD` - Your Anypoint Platform password
-2. Push to main branch or use manual workflow trigger
-
-## 📖 Documentation
-
-- **[Automated Deployment Guide](AUTOMATED_DEPLOYMENT_GUIDE.md)** - Complete guide for automated deployments
-- **[Exchange Deployment Guide](EXCHANGE_DEPLOYMENT_GUIDE.md)** - Manual deployment instructions
-- **[Deployment Scripts](maven-publish-to-exchange.sh)** - Legacy deployment scripts
-
-## 🎯 Current Version
-
-**Version**: 1.0.4  
-**Exchange URL**: https://anypoint.mulesoft.com/exchange/e5c02810-ef86-427e-8e6b-f3d3abe55974/a2a-external-wrapper/
-
-## 🔗 Quick Links
-
-- [Anypoint Exchange Asset](https://anypoint.mulesoft.com/exchange/e5c02810-ef86-427e-8e6b-f3d3abe55974/a2a-external-wrapper/)
-- [GitHub Actions Workflows](.github/workflows/)
-- [Deployment Logs](https://github.com/savy-mulesoft/a2a-external-agent-wrapper/actions)
-
-## 🛠️ Development
+- Maven 3.6+
+- MuleSoft Runtime 4.9.8+
 
 ### Local Development
-```bash
-# Run tests
-mvn clean test
 
-# Package application
-mvn clean package
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd a2a-external-wrapper
+   ```
 
-# Deploy to local Mule runtime
-./run-with-mule-runtime.sh
-```
+2. **Configure your external agent**
+   - Update `src/main/resources/external-agent-mapping.yaml`
+   - Update `src/main/resources/config.properties`
 
-### Testing the A2A Endpoint
-Test the A2A wrapper using JSON-RPC protocol:
+3. **Run the application**
+   ```bash
+   mvn clean package
+   mvn mule:run
+   ```
 
-```bash
-curl --location 'http://localhost:8081/external-azure-fins' \
---header 'Content-Type: application/json' \
---data '{
-    "jsonrpc":"2.0","id":"1","method":"message/send",
-    "params":{"message":{"role":"user","parts":[{"kind":"text","text":"How do I improve my credit score?"}]}}
-}'
-```
+4. **Test the integration**
+   ```bash
+   curl --location 'http://localhost:8081/external-azure-fins' \
+   --header 'Content-Type: application/json' \
+   --data '{
+     "jsonrpc":"2.0",
+     "id":"1",
+     "method":"message/send",
+     "params":{
+       "message":{
+         "role":"user",
+         "parts":[{"kind":"text","text":"How do I improve my credit score?"}]
+       }
+     }
+   }'
+   ```
 
-**Expected Response:**
+## API Endpoints
+
+### A2A Task Endpoint
+- **URL**: `http://localhost:8081/external-azure-fins`
+- **Method**: POST
+- **Content-Type**: application/json
+- **Protocol**: JSON-RPC 2.0 with A2A message structure
+
+### Agent Card Endpoint
+- **URL**: `http://localhost:8081/external-azure-fins/.well-known/agent.json`
+- **Method**: GET
+- **Returns**: Agent capabilities and metadata
+
+## Example Response
+
 ```json
 {
   "jsonrpc": "2.0",
   "id": "1",
   "result": {
-    "id": null,
-    "sessionId": null,
+    "id": "task-123",
+    "sessionId": "session-456",
     "status": {
       "state": "completed",
-      "timestamp": "2025-10-03T14:20:33Z",
+      "timestamp": "2025-01-05T18:19:33Z",
       "message": {
         "role": "agent",
         "parts": [
           {
             "kind": "text",
-            "text": "Thanks for your message. This is a standard demo reply from the Finance Agent. For credit health: pay on time, keep utilization under 30%, avoid hard inquiries, and review reports for inaccuracies. (This mock returns the same text for any prompt.)\n"
+            "text": "Response from your external agent"
           }
         ]
       }
@@ -118,49 +172,28 @@ curl --location 'http://localhost:8081/external-azure-fins' \
 }
 ```
 
-### Version Management
-The application uses semantic versioning (MAJOR.MINOR.PATCH):
-- **PATCH**: Bug fixes and small updates
-- **MINOR**: New features, backward compatible
-- **MAJOR**: Breaking changes
+## Use Cases
 
-## 📊 Deployment Status
+- **AI Agent Integration**: Connect external AI services to A2A networks
+- **Legacy System Bridging**: Expose existing HTTP APIs as A2A agents
+- **Multi-Agent Orchestration**: Enable external services to participate in agent conversations
+- **Protocol Translation**: Bridge different communication protocols
 
-| Environment | Status | Version | Last Updated |
-|-------------|--------|---------|--------------|
-| Exchange | ✅ Active | 1.0.4 | Latest |
-| GitHub | ✅ Active | Latest | Auto-sync |
+## Dependencies
 
-## 🆘 Troubleshooting
+- **MuleSoft Runtime**: 4.9.8
+- **A2A Connector**: 0.3.0-BETA
+- **HTTP Connector**: 1.10.4
+- **Inference Connector**: 0.5.7
 
-### Common Issues
-1. **Version Conflict (412 Error)**: Use `./auto-deploy-to-exchange.sh minor` to increment version
-2. **Authentication Failed**: Verify credentials in `settings.xml` or GitHub secrets
-3. **Permission Denied**: Contact Anypoint Platform administrator
+## Contributing
 
-### Debug Commands
-```bash
-# Check current version
-grep -o '<version>[^<]*</version>' pom.xml | head -1
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-# Test deployment with debug
-mvn clean deploy -s settings.xml -DskipTests -X
+## License
 
-# View deployment help
-./auto-deploy-to-exchange.sh --help
-```
-
-## 📝 Contributing
-
-1. Create feature branch from `main`
-2. Make changes and test locally
-3. Create pull request
-4. After merge, deployment happens automatically
-
-## 📄 License
-
-This project is licensed under the terms specified in the MuleSoft license agreement.
-
----
-
-**Need Help?** Check the [Automated Deployment Guide](AUTOMATED_DEPLOYMENT_GUIDE.md) for detailed instructions.
+This project is licensed under the MuleSoft license agreement.

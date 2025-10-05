@@ -13,8 +13,6 @@ agent:
       name: "Financial Dispute Resolution Guidance"
       description: "Guides users through disputes, fraud, duplicates."
     - id: "3"
-    name: "Credit Score Guidance"
-    description: "Guides users on how to improve credit scores"    
 
 # === External agent (sample cURL) ===
 # Paste your POST/GET cURL exactly as you use it in Postman.

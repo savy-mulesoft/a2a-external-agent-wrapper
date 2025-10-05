@@ -1,0 +1,233 @@
+name: Deploy to Anypoint Exchange
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version increment type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+      custom_version:
+        description: 'Custom version (optional, overrides version_type)'
+        required: false
+        type: string
+
+env:
+  MAVEN_OPTS: -Xmx1024m
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test Application
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 8
+      uses: actions/setup-java@v4
+      with:
+        java-version: '8'
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Run tests
+      run: mvn clean test -s settings.xml
+
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Exchange
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up JDK 8
+      uses: actions/setup-java@v4
+      with:
+        java-version: '8'
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+    - name: Get current version
+      id: current_version
+      run: |
+        CURRENT_VERSION=$(grep -o '<version>[^<]*</version>' pom.xml | head -1 | sed 's/<version>\(.*\)<\/version>/\1/')
+        echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current version: $CURRENT_VERSION"
+        
+    - name: Determine new version
+      id: new_version
+      run: |
+        CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
+        
+        # Check if custom version is provided
+        if [ -n "${{ github.event.inputs.custom_version }}" ]; then
+          NEW_VERSION="${{ github.event.inputs.custom_version }}"
+          echo "Using custom version: $NEW_VERSION"
+        elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          # Manual trigger with version type
+          VERSION_TYPE="${{ github.event.inputs.version_type }}"
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          
+          case $VERSION_TYPE in
+            "major")
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            "minor")
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            "patch")
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "Incrementing $VERSION_TYPE version: $CURRENT_VERSION → $NEW_VERSION"
+        elif [[ $GITHUB_REF == refs/tags/v* ]]; then
+          # Tag-based deployment
+          NEW_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Using tag version: $NEW_VERSION"
+        else
+          # Auto-increment patch version for main/master branch
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "Auto-incrementing patch version: $CURRENT_VERSION → $NEW_VERSION"
+        fi
+        
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version will be: $NEW_VERSION"
+        
+    - name: Update version in pom.xml
+      run: |
+        NEW_VERSION="${{ steps.new_version.outputs.version }}"
+        echo "Updating pom.xml version to $NEW_VERSION"
+        sed -i "s/<version>[^<]*<\/version>/<version>$NEW_VERSION<\/version>/" pom.xml
+        
+    - name: Verify version update
+      run: |
+        UPDATED_VERSION=$(grep -o '<version>[^<]*</version>' pom.xml | head -1 | sed 's/<version>\(.*\)<\/version>/\1/')
+        echo "Updated version in pom.xml: $UPDATED_VERSION"
+        
+    - name: Create settings.xml with secrets
+      run: |
+        mkdir -p ~/.m2
+        cat > ~/.m2/settings.xml << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <settings xmlns="http://maven.apache.org/SETTINGS/1.1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.1.0 http://maven.apache.org/xsd/settings-1.1.0.xsd">
+          <servers>
+            <server>
+              <id>anypoint-exchange-v3</id>
+              <username>\${{ secrets.ANYPOINT_USERNAME }}</username>
+              <password>\${{ secrets.ANYPOINT_PASSWORD }}</password>
+            </server>
+          </servers>
+        </settings>
+        EOF
+        
+    - name: Build and deploy to Exchange
+      run: |
+        echo "Building and deploying to Anypoint Exchange..."
+        mvn clean deploy -s ~/.m2/settings.xml -DskipTests -Dmaven.javadoc.skip=true -B
+        
+    - name: Commit version change
+      if: github.event_name != 'pull_request'
+      run: |
+        NEW_VERSION="${{ steps.new_version.outputs.version }}"
+        
+        # Check if there are changes to commit
+        if git diff --quiet pom.xml; then
+          echo "No changes to commit"
+        else
+          git add pom.xml
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          
+          # Create tag
+          git tag -a "v$NEW_VERSION" -m "Release version $NEW_VERSION"
+          
+          # Push changes
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "v$NEW_VERSION"
+          
+          echo "Version $NEW_VERSION committed and tagged"
+        fi
+        
+    - name: Create GitHub Release
+      if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.new_version.outputs.version }}
+        release_name: Release v${{ steps.new_version.outputs.version }}
+        body: |
+          ## Changes in v${{ steps.new_version.outputs.version }}
+          
+          - Automated deployment to Anypoint Exchange
+          - Version: ${{ steps.new_version.outputs.version }}
+          - Commit: ${{ github.sha }}
+          
+          ### Exchange Details
+          - **Group ID**: e5c02810-ef86-427e-8e6b-f3d3abe55974
+          - **Asset ID**: a2a-external-wrapper
+          - **Version**: ${{ steps.new_version.outputs.version }}
+          - **Exchange URL**: https://anypoint.mulesoft.com/exchange/e5c02810-ef86-427e-8e6b-f3d3abe55974/a2a-external-wrapper/
+        draft: false
+        prerelease: false
+        
+    - name: Deployment Summary
+      run: |
+        NEW_VERSION="${{ steps.new_version.outputs.version }}"
+        echo "🎉 Successfully deployed version $NEW_VERSION to Anypoint Exchange!"
+        echo ""
+        echo "📋 Deployment Details:"
+        echo "   - Group ID: e5c02810-ef86-427e-8e6b-f3d3abe55974"
+        echo "   - Asset ID: a2a-external-wrapper"
+        echo "   - Version: $NEW_VERSION"
+        echo "   - Exchange URL: https://anypoint.mulesoft.com/exchange/e5c02810-ef86-427e-8e6b-f3d3abe55974/a2a-external-wrapper/"
+        echo ""
+        echo "🔗 View in Exchange: https://anypoint.mulesoft.com/exchange/e5c02810-ef86-427e-8e6b-f3d3abe55974/a2a-external-wrapper/"

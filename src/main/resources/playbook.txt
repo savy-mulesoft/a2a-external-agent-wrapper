@@ -36,8 +36,8 @@ agent:
   version: "1.0.0"
   description: "What the agent does"
   skills:
-    - { id: "1", name: "Transaction Issues", description: "..." }
-    - { id: "2", name: "Financial Dispute Resolution Guidance", description: "..." }
+    - { id: "1", name: "Transaction Issues", description: "...", tags: ["support", "transactions"] }
+    - { id: "2", name: "Financial Dispute Resolution Guidance", description: "...", tags: ["disputes", "resolution"] }
 
 A) Update config.properties
 - Set these keys from YAML (create or overwrite):
@@ -69,10 +69,23 @@ B) Update a2a-external-wrapper.xml (A2A card + flows)
 1. DO NOT MODIFY <a2a:server-config> or <http:listener-config> or any connector configurations - these remain as-is.
 
 2. Replace ONLY the <a2a:skills> children with **exactly one <a2a:agent-skill> per agent.skill.N.* set present in config.properties** (no more, no less). Do NOT use expressions inside a2a:agent-skill attributes (card attributes don't support expressions).
+   
+   IMPORTANT - A2A Protocol Compliance:
+   - ProtocolVersion: The A2A connector (v0.3.0-BETA) does not expose protocolVersion as an XML attribute.
+     It should be automatically set by the connector, but if missing from the agent card JSON output,
+     this is a known connector limitation. Tags are the critical requirement that IS supported.
+   - Each skill MUST include <a2a:tags> with at least one tag (A2A specification requirement - THIS IS CRITICAL)
+   
    Generate explicit static XML nodes by reading the properties and writing literal strings, e.g.:
    <a2a:agent-skill id="1" name="Transaction Issues">
      <a2a:description><![CDATA[Customer Support for Transaction Issues]]></a2a:description>
+     <a2a:tags>
+       <a2a:tag value="support"/>
+       <a2a:tag value="transactions"/>
+     </a2a:tags>
    </a2a:agent-skill>
+   
+   Tags should be derived from skill.tags in YAML or inferred from skill name/description if not provided.
    <!-- Skills generated from config.properties to mirror agent.skill.N.* exactly. -->
 
 2b. The "Apply external headers" transform should use this DataWeave expression (do NOT add try-catch or defaults):

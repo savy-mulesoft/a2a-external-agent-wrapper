@@ -32,14 +32,29 @@
     <a2a:skills>
       <a2a:agent-skill id="1" name="Transaction Issues">
         <a2a:description><![CDATA[Customer Support for Transaction Issues]]></a2a:description>
+        <a2a:tags>
+          <a2a:tag value="customer-support"/>
+          <a2a:tag value="transactions"/>
+          <a2a:tag value="financial-services"/>
+        </a2a:tags>
       </a2a:agent-skill>
 
       <a2a:agent-skill id="2" name="Financial Dispute Resolution Guidance">
         <a2a:description><![CDATA[Guides users through disputes, fraud, duplicates.]]></a2a:description>
+        <a2a:tags>
+          <a2a:tag value="dispute-resolution"/>
+          <a2a:tag value="fraud"/>
+          <a2a:tag value="financial-services"/>
+        </a2a:tags>
       </a2a:agent-skill>
 
       <a2a:agent-skill id="3" name="Loan Recommendation">
         <a2a:description><![CDATA[Guides users best loan options]]></a2a:description>
+        <a2a:tags>
+          <a2a:tag value="loans"/>
+          <a2a:tag value="recommendations"/>
+          <a2a:tag value="financial-services"/>
+        </a2a:tags>
       </a2a:agent-skill>
     </a2a:skills>
   </a2a:card>

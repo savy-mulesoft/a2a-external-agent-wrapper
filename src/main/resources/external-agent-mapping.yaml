@@ -9,12 +9,15 @@ agent:
     - id: "1"
       name: "Transaction Issues"
       description: "Customer Support for Transaction Issues"
+      tags: ["customer-support", "transactions", "financial-services"]
     - id: "2"
       name: "Financial Dispute Resolution Guidance"
       description: "Guides users through disputes, fraud, duplicates."
+      tags: ["dispute-resolution", "fraud", "financial-services"]
     - id: "3"
       name: "Loan Recommendation"
       description: "Guides users best loan options"
+      tags: ["loans", "recommendations", "financial-services"]
 
 # === External agent (sample cURL) ===
 # Paste your POST/GET cURL exactly as you use it in Postman.
